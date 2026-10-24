@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER-LINK // Voice Comm Simulator</title>
+    <style>
+        :root {
+            --bg-color: #030712;
+            --card-bg: rgba(15, 23, 42, 0.75);
+            --border-color: rgba(56, 189, 248, 0.2);
+            --primary-cyan: #06b6d4;
+            --bright-cyan: #38bdf8;
+            --neon-green: #10b981;
+            --neon-red: #ef4444;
+            --neon-gold: #f59e0b;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --glow-cyan: rgba(6, 182, 212, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Animated Grid Background */
+        .grid-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(to right, rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Vignette Scanlines */
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 6px 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 90%;
+            max-width: 900px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2.5rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px var(--glow-cyan);
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* HUD Header */
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+
+        .title-box h1 {
+            font-size: 1.8rem;
+            letter-spacing: 3px;
+            color: var(--bright-cyan);
+            text-transform: uppercase;
+            text-shadow: 0 0 10px var(--glow-cyan);
+        }
+
+        .title-box p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid transparent;
+            text-transform: uppercase;
+        }
+
+        .status-badge.scanning {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--neon-gold);
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .status-badge.passed {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--neon-green);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .status-badge.failed {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--neon-red);
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+            box-shadow: 0 0 8px currentColor;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        /* Screen Displays */
+        .screen {
+            background: rgba(3, 7, 18, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            position: relative;
+        }
+
+        .screen-msg {
+            font-size: 1.3rem;
+            line-height: 1.6;
+            letter-spacing: 0.5px;
+            max-width: 650px;
+        }
+
+        .sub-text {
+            font-size: 0.95rem;
+            color: var(--text-dim);
+        }
+
+        /* Interactive Buttons */
+        .btn {
+            background: linear-gradient(135deg, var(--primary-cyan), #0284c7);
+            color: white;
+            border: none;
+            padding: 0.9rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px var(--glow-cyan);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.8);
+            background: linear-gradient(135deg, var(--bright-cyan), var(--primary-cyan));
+        }
+
+        .btn-amazon {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
+        }
+
+        .btn-amazon:hover {
+            box-shadow: 0 0 25px rgba(249, 115, 22, 0.8);
+            background: linear-gradient(135deg, #fb923c, #f97316);
+        }
+
+        /* Visualizer HUD */
+        .visualizer-container {
+            width: 100%;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .bar {
+            width: 6px;
+            height: 15px;
+            background: var(--bright-cyan);
+            border-radius: 3px;
+            transition: height 0.05s ease;
+            box-shadow: 0 0 8px var(--bright-cyan);
+        }
+
+        /* Game Command Box */
+        .command-feed {
+            font-family: 'Courier New', Courier, monospace;
+            background: rgba(0, 0, 0, 0.5);
+            border-left: 3px solid var(--bright-cyan);
+            padding: 0.8rem 1.2rem;
+            border-radius: 0 8px 8px 0;
+            width: 100%;
+            text-align: left;
+            color: var(--bright-cyan);
+            font-size: 0.95rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Device Info Details */
+        .device-info {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            background: rgba(255,255,255,0.03);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px dashed var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="grid-bg"></div>
+    <div class="scanlines"></div>
+
+    <div class="container">
+        <!-- HUD Header -->
+        <div class="hud-header">
+            <div class="title-box">
+                <h1>Cyber-Link OS</h1>
+                <p>Tactical Voice Command System v2.4</p>
+            </div>
+            <div id="statusBadge" class="status-badge scanning">
+                <span class="dot"></span>
+                <span id="statusText">Scanning Gear</span>
+            </div>
+        </div>
+
+        <!-- Dynamic Game Screen -->
+        <div id="screen" class="screen">
+            <p class="screen-msg">Initiating audio interface sweep... Please grant microphone access to calibrate system.</p>
+            <button id="startScanBtn" class="btn" onclick="initializeAudioCheck()">
+                <span>Initialize Calibration</span>
+            </button>
+        </div>
+
+        <!-- Terminal Command Log -->
+        <div id="commandFeed" class="command-feed hidden">
+            <strong>SYSTEM LOG:</strong> <span id="logText">Awaiting command input...</span>
+        </div>
+    </div>
+
+    <script>
+        let audioContext;
+        let analyser;
+        let microphone;
+        let recognition;
+        let isHeadsetDetected = false;
+        let detectedDeviceName = "";
+
+        // Text-To-Speech Synthesis Function
+        function speak(text, callback) {
+            window.speechSynthesis.cancel(); // Stop active audio
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            
+            // Try selecting a cool English voice if available
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha')));
+            if (preferredVoice) utterance.voice = preferredVoice;
+
+            if (callback) {
+                utterance.onend = callback;
+            }
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Web Audio Synthesizer Sound Effects
+        function playSfx(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'success') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.3);
+                } else if (type === 'fail') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.4);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.4);
+                }
+            } catch (e) {
+                console.log("Audio SFX Error:", e);
+            }
+        }
+
+        // Detect and Evaluate Audio Inputs
+        async function initializeAudioCheck() {
+            const screen = document.getElementById('screen');
+            screen.innerHTML = `<p class="screen-msg">Scanning connected audio input hardware...</p>`;
+
+            try {
+                // Request stream access to get full device labels
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+                // Keywords identifying headsets or communications gear
+                const headsetKeywords = ['headset', 'headphone', 'mic', 'microphone', 'usb', 'bluetooth', 'wireless', 'rtx', 'hyperx', 'corsair', 'razer', 'logitech', 'steelseries', 'astro', 'jabra', 'airpods'];
+
+                let headsetFound = false;
+                detectedDeviceName = "";
+
+                for (let input of audioInputs) {
+                    const label = input.label.toLowerCase();
+                    if (headsetKeywords.some(keyword => label.includes(keyword)) && !label.includes('realtek') && !label.includes('internal') && !label.includes('built-in')) {
+                        headsetFound = true;
+                        detectedDeviceName = input.label || "Gaming Headset Microphone";
+                        break;
+                    }
+                }
+
+                // If user has an explicit non-internal mic, consider it headset-ready
+                if (!headsetFound && audioInputs.length > 0) {
+                    const primaryLabel = audioInputs[0].label.toLowerCase();
+                    if (primaryLabel && !primaryLabel.includes('built-in') && !primaryLabel.includes('internal')) {
+                        headsetFound = true;
+                        detectedDeviceName = audioInputs[0].label;
+                    }
+                }
+
+                if (headsetFound) {
+                    handleHeadsetDetected(stream);
+                } else {
+                    // Release initial temporary stream if rejected
+                    stream.getTracks().forEach(track => track.stop());
+                    handleHeadsetMissing();
+                }
+
+            } catch (err) {
+                console.error("Mic Access Error:", err);
+                handleHeadsetMissing();
+            }
+        }
+
+        // Headset Detected Success State
+        function handleHeadsetDetected(stream) {
+            isHeadsetDetected = true;
+            playSfx('success');
+
+            // Update Badge
+            const badge = document.getElementById('statusBadge');
+            badge.className = "status-badge passed";
+            document.getElementById('statusText').innerText = "Headset Online";
+
+            const screen = document.getElementById('screen');
+            const phrase = "Seems fun! Dynamic headset detected. System fully online.";
+
+            screen.innerHTML = `
+                <div class="device-info">HARDWARE DETECTED: ${detectedDeviceName || "Tactical Headset Microphone"}</div>
+                <p class="screen-msg" style="color: var(--neon-green);">${phrase}</p>
+                <div class="visualizer-container" id="visualizer"></div>
+                <p class="sub-text">Press Start Mission to enter voice-controlled gameplay mode.</p>
+                <button class="btn" onclick="startVoiceGame('${stream.id}', true)">Start Mission</button>
+            `;
+
+            createVisualizerBars();
+            setupAudioAnalyser(stream);
+
+            // Voice synthesis greeting
+            speak(phrase);
+        }
+
+        // Headset Missing Fail State
+        function handleHeadsetMissing() {
+            isHeadsetDetected = false;
+            playSfx('fail');
+
+            // Update Badge
+            const badge = document.getElementById('statusBadge');
+            badge.className = "status-badge failed";
+            document.getElementById('statusText').innerText = "Headset Missing";
+
+            const screen = document.getElementById('screen');
+            const phrase = "Headset not detected! You need a gaming headset microphone to control this game. Please order one from Amazon to proceed.";
+
+            screen.innerHTML = `
+                <p class="screen-msg" style="color: var(--neon-red);">${phrase}</p>
+                <a href="https://www.amazon.com/s?k=gaming+headset+with+microphone" 
+                   target="_top" 
+                   rel="noopener noreferrer" 
+                   class="btn btn-amazon">
+                    🛒 Order Headset from Amazon
+                </a>
+                <p class="sub-text" style="margin-top: 10px;">Note: Clicking will teleport you directly to Amazon outside iframe.</p>
+            `;
+
+            // Voice synthesis warning
+            speak(phrase);
+        }
+
+        // Audio Frequency Visualizer
+        function createVisualizerBars() {
+            const container = document.getElementById('visualizer');
+            if (!container) return;
+            container.innerHTML = '';
+            for (let i = 0; i < 24; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                container.appendChild(bar);
+            }
+        }
+
+        function setupAudioAnalyser(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+            analyser.fftSize = 64;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            const bars = document.querySelectorAll('.bar');
+
+            function updateVisualizer() {
+                if (!document.getElementById('visualizer')) return;
+                analyser.getByteFrequencyData(dataArray);
+
+                bars.forEach((bar, index) => {
+                    const value = dataArray[index] || 0;
+                    const height = Math.max(10, (value / 255) * 60);
+                    bar.style.height = `${height}px`;
+                });
+
+                requestAnimationFrame(updateVisualizer);
+            }
+            updateVisualizer();
+        }
+
+        // Voice Command Gameplay Engine
+        function startVoiceGame() {
+            const screen = document.getElementById('screen');
+            document.getElementById('commandFeed').classList.remove('hidden');
+
+            const welcomeMsg = "Mission active! Say commands out loud into your microphone: 'Shields Up', 'Fire Laser', 'Status Report', or 'Hyperjump'.";
+            
+            screen.innerHTML = `
+                <div class="visualizer-container" id="visualizer"></div>
+                <p class="screen-msg" id="gameText" style="color: var(--bright-cyan);">Awaiting Voice Command...</p>
+                <p class="sub-text">Speak loud and clear into your headset microphone!</p>
+            `;
+            createVisualizerBars();
+
+            speak(welcomeMsg, () => {
+                initSpeechRecognition();
+            });
+        }
+
+        // Speech-to-Text Recognition Setup
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                document.getElementById('logText').innerText = "Web Speech API not supported in this browser. Please use Chrome or Edge.";
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = function(event) {
+                const lastResultIndex = event.results.length - 1;
+                const command = event.results[lastResultIndex][0].transcript.trim().toLowerCase();
+                
+                document.getElementById('logText').innerText = `Heard: "${command}"`;
+                processGameCommand(command);
+            };
+
+            recognition.onerror = function(event) {
+                console.log("Speech recognition error:", event.error);
+            };
+
+            recognition.onend = function() {
+                // Keep listening continuously during game mode
+                if (isHeadsetDetected) {
+                    try { recognition.start(); } catch(e){}
+                }
+            };
+
+            try {
+                recognition.start();
+                document.getElementById('logText').innerText = "Listening for headset commands...";
+            } catch(e) {
+                console.log("Recognition start error:", e);
+            }
+        }
+
+        // Game Command Logic Engine
+        function processGameCommand(cmd) {
+            const gameText = document.getElementById('gameText');
+            let response = "";
+
+            if (cmd.includes('shield') || cmd.includes('shields')) {
+                response = "Energy shields deployed at one hundred percent capacity!";
+                playSfx('success');
+            } else if (cmd.includes('fire') || cmd.includes('laser') || cmd.includes('shoot')) {
+                response = "Plasma cannons fired! Enemy target neutralised.";
+                playSfx('fail');
+            } else if (cmd.includes('status') || cmd.includes('report')) {
+                response = "All headset audio systems operational. Hull integrity is solid.";
+                playSfx('success');
+            } else if (cmd.includes('jump') || cmd.includes('hyper')) {
+                response = "Hyperdrive engaged! Jumping to lightspeed.";
+                playSfx('success');
+            } else {
+                response = `Command recognized: "${cmd}". Standby for tactical response.`;
+            }
+
+            gameText.innerText = response;
+            speak(response);
+        }
+
+        // Pre-load synth voices on page load
+        window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+    </script>
+</body>
+</html>
